@@ -1,0 +1,6 @@
+*.pyc
+*.txt
+*.pth
+.DS_Store
+log
+ckpt

@@ -19,7 +19,7 @@ This repository:
 >
 > meanshift bandwidth = mean cell radius
 >
-> speed = 4s per image with size [100*100] 
+> speed = 0.2s per image with size [100*100] 
 
 Original in paper:
 

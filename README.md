@@ -17,9 +17,9 @@ This repository:
 >
 > delta of angle = 30
 >
-> meanshift bandwidth = mean cell radius
+> meanshift bandwidth = 1/3 * mean cell diameter
 >
-> speed = 0.2s per image with size [100*100] 
+> speed = 10s per image with size [300*300] 
 
 Original in paper:
 

@@ -50,7 +50,7 @@ def get_area_templates(rmin,rmax,d=_delta,weight=default_weight):
 
 
 def v_a_from_templates(y,x,area_templates,angle):
-    orient = angle[y][x]
+    orient = (angle[y][x]+math.pi)%(2*math.pi)
     radio =  2*math.pi/len(area_templates)
     index = math.floor((orient/radio)+0.5)
     index = index%len(area_templates) #radius [359.5,360)
@@ -76,3 +76,53 @@ def v_a_from_templates(y,x,area_templates,angle):
 
     return voting_area
     
+
+
+def mean_shift(src,bandwidth):
+    flags = np.zeros_like(src)
+    h,w = src.shape
+
+    def get_center(cy,cx):
+        xl = max(0,cx-bandwidth)
+        xh = min(w,cx+bandwidth)
+        yl = max(0,cy-bandwidth)
+        yh = min(h,cy+bandwidth)
+        count = 0
+        x_sum = 0
+        y_sum = 0
+        for p in range(xl,xh):
+            for q in range(yl,yh):
+                num = src[q][p]
+                count += num
+                x_sum += num*p
+                y_sum += num*q
+        if count == 0:
+            return cy,cx,count
+        else:
+            mean_y = math.floor(y_sum / count + 0.5)
+            mean_x = math.floor(x_sum / count + 0.5)
+            return mean_y, mean_x,count
+    
+    seeds = []
+    
+    for i in range(w):
+        for j in range(h):
+            if flags[j][i] == 1 :
+                continue
+            x = i
+            y = j
+            while True:
+                y_m,x_m,c = get_center(y,x)
+                if flags[y_m][x_m] == 1:
+                    break
+                if y_m == y and x_m == x :
+                    flags[y_m][x_m] =1
+                    if c > 0:
+                        seeds.append((y_m,x_m))
+                    break
+                y = y_m
+                x = x_m
+
+    return seeds
+
+

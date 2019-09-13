@@ -96,6 +96,54 @@ Mat find_local_max(Mat area,int distance,double thresh_rel){
     return mask;
 }
 
+class VA_GEN{
+public:
+    
+    vector<Mat>& templates;
+    Mat& my_angle;
+    Mat* result;
+    void operator() (tbb::blocked_range<int>& r) const {
+        const Mat& angle = my_angle;
+        int tsize = templates.size();
+        float radio = 2*PI/tsize;
+        int rmax = templates[0].cols/2;
+        for(int i= r.begin();i!= r.end();i++){
+            Mat& tmp = result[i];
+
+            for(int j =0 ;j<angle.cols;j++){
+
+                float orient = angle.at<double>(i,j)+ PI;
+                if(orient > 2*PI) orient -= 2*PI;
+                int index = floor((orient/radio)+0.5);
+                index %= tsize;
+                int move_y = rmax - i;
+                int move_x = rmax - j;
+
+                int x_low = max(j-rmax,0);
+                int x_high = min(j+rmax,angle.cols);
+                int y_low = max(i-rmax,0);
+                int y_high = min(i+rmax,angle.rows);
+
+                int s_x_l = x_low + move_x;
+                int s_x_h = x_high + move_x;
+                int s_y_l = y_low + move_y;
+                int s_y_h = y_high + move_y;
+                // cout <<y_low<<" "<< y_high <<" "<<x_low<<" "<<x_high<<endl;
+                // cout <<s_y_l<<" "<< s_y_h << " "<< s_x_l << " " << s_x_h<<endl;
+                tmp(Range(y_low,y_high),Range(x_low,x_high)) += templates[index](Range(s_y_l,s_y_h),Range(s_x_l,s_x_h));
+
+            }
+        }
+    }
+
+    VA_GEN(vector<Mat>& area_templates,Mat& angle,Mat * arr ):templates(area_templates),my_angle(angle),result(arr){
+    }
+};
+void parallel_v_a(vector<Mat> area_templates,Mat angle,Mat * imgarr){
+    VA_GEN a(area_templates,angle,imgarr);
+    tbb::parallel_for(tbb::blocked_range<int>(0,angle.rows), a);
+}
+
 int main(int argc,char** argv){
     // read img and trans to gray
     Mat img = imread("notebooks/speci2.png"),gray;
@@ -133,17 +181,15 @@ int main(int argc,char** argv){
     vector<Mat> area_templates = get_area_templates(5,15,gauss_weight);
 
     tbb::tick_count t1 = tbb::tick_count::now();
-    vector<Mat> result_serial;
-    for(int x = 0;x< img.cols;x++){
-        for(int y = 0; y< img.rows;y++){
-            if(magni.at<double>(y,x) > ma_mean+200)
-                result_serial.push_back(v_a_from_templates(y,x,area_templates,angle));
-        }
+    Mat results[angle.rows];
+    for(int i = 0;i<angle.rows;i++){
+        results[i] = Mat::zeros(angle.rows,angle.cols,CV_64F);
     }
+    parallel_v_a(area_templates,angle,results);
 
     tbb::tick_count t2 = tbb::tick_count::now();
     Mat voting_area = Mat::zeros(img.rows,img.cols,CV_64F);
-    for(Mat i: result_serial){
+    for(Mat i: results){
         voting_area += i;
     }
     tbb::tick_count t3 = tbb::tick_count::now();

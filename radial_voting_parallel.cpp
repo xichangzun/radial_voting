@@ -101,46 +101,51 @@ public:
     
     vector<Mat>& templates;
     Mat& my_angle;
+    Mat& my_magni;
     Mat* result;
+    double my_mean;
     void operator() (tbb::blocked_range<int>& r) const {
         const Mat& angle = my_angle;
+        const Mat& magni = my_magni;
         int tsize = templates.size();
         float radio = 2*PI/tsize;
         int rmax = templates[0].cols/2;
+        double ma_mean = my_mean;
         for(int i= r.begin();i!= r.end();i++){
             Mat& tmp = result[i];
-
             for(int j =0 ;j<angle.cols;j++){
+                if(magni.at<double>(i,j) > ma_mean){
+                    float orient = angle.at<double>(i,j)+ PI;
+                    if(orient > 2*PI) orient -= 2*PI;
+                    int index = floor((orient/radio)+0.5);
+                    index %= tsize;
+                    int move_y = rmax - i;
+                    int move_x = rmax - j;
 
-                float orient = angle.at<double>(i,j)+ PI;
-                if(orient > 2*PI) orient -= 2*PI;
-                int index = floor((orient/radio)+0.5);
-                index %= tsize;
-                int move_y = rmax - i;
-                int move_x = rmax - j;
+                    int x_low = max(j-rmax,0);
+                    int x_high = min(j+rmax,angle.cols);
+                    int y_low = max(i-rmax,0);
+                    int y_high = min(i+rmax,angle.rows);
 
-                int x_low = max(j-rmax,0);
-                int x_high = min(j+rmax,angle.cols);
-                int y_low = max(i-rmax,0);
-                int y_high = min(i+rmax,angle.rows);
+                    int s_x_l = x_low + move_x;
+                    int s_x_h = x_high + move_x;
+                    int s_y_l = y_low + move_y;
+                    int s_y_h = y_high + move_y;
+                    tmp(Range(y_low,y_high),Range(x_low,x_high)) += templates[index](Range(s_y_l,s_y_h),Range(s_x_l,s_x_h));
+                }
 
-                int s_x_l = x_low + move_x;
-                int s_x_h = x_high + move_x;
-                int s_y_l = y_low + move_y;
-                int s_y_h = y_high + move_y;
-                // cout <<y_low<<" "<< y_high <<" "<<x_low<<" "<<x_high<<endl;
-                // cout <<s_y_l<<" "<< s_y_h << " "<< s_x_l << " " << s_x_h<<endl;
-                tmp(Range(y_low,y_high),Range(x_low,x_high)) += templates[index](Range(s_y_l,s_y_h),Range(s_x_l,s_x_h));
 
             }
         }
     }
 
-    VA_GEN(vector<Mat>& area_templates,Mat& angle,Mat * arr ):templates(area_templates),my_angle(angle),result(arr){
+    VA_GEN(vector<Mat>& area_templates,Mat& angle,Mat& magni,Mat * arr):templates(area_templates),my_angle(angle),my_magni(magni),result(arr){
+        my_mean = mean(magni)[0] + 200;
     }
 };
-void parallel_v_a(vector<Mat> area_templates,Mat angle,Mat * imgarr){
-    VA_GEN a(area_templates,angle,imgarr);
+void parallel_v_a(vector<Mat>& area_templates, Mat& angle, Mat& magni, Mat * imgarr){
+
+    VA_GEN a(area_templates,angle,magni,imgarr);
     tbb::parallel_for(tbb::blocked_range<int>(0,angle.rows), a);
 }
 
@@ -177,7 +182,6 @@ int main(int argc,char** argv){
 
     // get voting area
     tbb::tick_count t0 = tbb::tick_count::now();
-    double ma_mean = mean(magni)[0];
     vector<Mat> area_templates = get_area_templates(5,15,gauss_weight);
 
     tbb::tick_count t1 = tbb::tick_count::now();
@@ -185,7 +189,7 @@ int main(int argc,char** argv){
     for(int i = 0;i<angle.rows;i++){
         results[i] = Mat::zeros(angle.rows,angle.cols,CV_64F);
     }
-    parallel_v_a(area_templates,angle,results);
+    parallel_v_a(area_templates,angle,magni,results);
 
     tbb::tick_count t2 = tbb::tick_count::now();
     Mat voting_area = Mat::zeros(img.rows,img.cols,CV_64F);

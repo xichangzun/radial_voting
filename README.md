@@ -5,7 +5,7 @@ nonofficial implementation of radial voting methods.
 
 # Dependency 
 
-`opencv` `numpy`
+`opencv` `numpy` `tbb`
 
 # Details
 
@@ -19,7 +19,7 @@ This repository:
 >
 > meanshift bandwidth = 1/3 * mean cell diameter
 >
-> speed = 10s per image with size [300*300] 
+> speed(cpu) = 0.2s per image with size [300*300] 
 
 Original in paper:
 
